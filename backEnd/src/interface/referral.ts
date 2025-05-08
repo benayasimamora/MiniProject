@@ -21,3 +21,8 @@ export interface ICoupon {
   is_used: boolean;
   created_at: Date;
 }
+
+export interface IRewardResponse {
+  point: number;
+  coupons: ICoupon[];
+}
