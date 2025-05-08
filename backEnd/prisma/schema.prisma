@@ -34,6 +34,7 @@ enum point_source {
 enum transaction_status {
   WAITING_PAYMENT
   WAITING_CONFIRMATION
+  WAITING
   CONFIRMED
   REJECTED
   EXPIRED
