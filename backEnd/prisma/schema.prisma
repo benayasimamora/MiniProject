@@ -8,126 +8,21 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
-model coupons {
-  id              Int            @id @default(autoincrement())
-  user_id         Int
-  code            String         @unique
-  discount_amount Int
-  expired_at      DateTime       @db.Timestamptz(6)
-  is_used         Boolean        @default(false)
-  created_at      DateTime?      @default(now()) @db.Timestamptz(6)
-  users           users          @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  transactions    transactions[]
+enum user_role {
+  CUSTOMER
+  ORGANIZER
 }
 
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
-model events {
-  id              Int            @id @default(autoincrement())
-  organizer_id    Int
-  name            String
-  description     String
-  category        String
-  location        String
-  paid            Boolean
-  price           Int
-  start_date      DateTime       @db.Timestamptz(6)
-  end_date        DateTime       @db.Timestamptz(6)
-  total_seats     Int
-  remaining_seats Int
-  created_at      DateTime?      @default(now()) @db.Timestamptz(6)
-  users           users          @relation(fields: [organizer_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  reviews         reviews[]
-  transactions    transactions[]
-  vouchers        vouchers[]
+enum Organizer_Status {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
-model points {
-  id         Int          @id @default(autoincrement())
-  user_id    Int
-  amount     Int
-  source     point_source
-  expired_at DateTime     @db.Timestamptz(6)
-  created_at DateTime?    @default(now()) @db.Timestamptz(6)
-  users      users        @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-}
-
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
-model referral_logs {
-  id                                          Int       @id @default(autoincrement())
-  referred_by_id                              Int
-  referral_used_id                            Int
-  created_at                                  DateTime? @default(now()) @db.Timestamptz(6)
-  users_referral_logs_referral_used_idTousers users     @relation("referral_logs_referral_used_idTousers", fields: [referral_used_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  users_referral_logs_referred_by_idTousers   users     @relation("referral_logs_referred_by_idTousers", fields: [referred_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-}
-
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
-model reviews {
-  id             Int          @id @default(autoincrement())
-  transaction_id Int          @unique
-  event_id       Int
-  rating         Int
-  comment        String
-  created_at     DateTime?    @default(now()) @db.Timestamptz(6)
-  events         events       @relation(fields: [event_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  transactions   transactions @relation(fields: [transaction_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-}
-
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
-model transactions {
-  id              Int                @id @default(autoincrement())
-  user_id         Int
-  event_id        Int
-  ticket_quantity Int
-  price           Int
-  total_price     Int
-  status          transaction_status
-  payment_proof   String?
-  used_point      Int                @default(0)
-  used_voucher_id Int?
-  used_coupon_id  Int?
-  created_at      DateTime?          @default(now()) @db.Timestamptz(6)
-  reviews         reviews?
-  events          events             @relation(fields: [event_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  coupons         coupons?           @relation(fields: [used_coupon_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  vouchers        vouchers?          @relation(fields: [used_voucher_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  users           users              @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-}
-
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
-model users {
-  id                                                  Int             @id @default(autoincrement())
-  full_name                                           String
-  email                                               String          @unique
-  password                                            String
-  role                                                user_role
-  referral_code                                       String          @unique
-  profile_picture                                     String?
-  is_verified                                         Boolean         @default(false)
-  created_at                                          DateTime?       @default(now()) @db.Timestamptz(6)
-  updated_at                                          DateTime?       @default(now()) @db.Timestamptz(6)
-  coupons                                             coupons[]
-  events                                              events[]
-  points                                              points[]
-  referral_logs_referral_logs_referral_used_idTousers referral_logs[] @relation("referral_logs_referral_used_idTousers")
-  referral_logs_referral_logs_referred_by_idTousers   referral_logs[] @relation("referral_logs_referred_by_idTousers")
-  transactions                                        transactions[]
-}
-
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
-model vouchers {
-  id              Int            @id @default(autoincrement())
-  event_id        Int
-  code            String         @unique
-  discount_amount Int
-  discount_type   String
-  start_date      DateTime       @db.Timestamptz(6)
-  end_date        DateTime       @db.Timestamptz(6)
-  is_active       Boolean        @default(true)
-  transactions    transactions[]
-  events          events         @relation(fields: [event_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+enum Voucher_Status {
+  ACTIVE
+  USED
+  EXPIRED
 }
 
 enum point_source {
@@ -144,7 +39,153 @@ enum transaction_status {
   CANCELED
 }
 
-enum user_role {
-  CUSTOMER
-  ORGANIZER
+model User {
+  id                Int                @id @default(autoincrement())
+  full_name         String
+  email             String             @unique
+  password          String
+  role              user_role          @default(CUSTOMER)
+  referral_code     String             @unique
+  profile_picture   String?
+  is_verified       Boolean            @default(false)
+  created_at        DateTime?          @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime?          @default(now()) @db.Timestamptz(6)
+  organizer_profile Organizer_Profile?
+  coupons           Coupons[]
+  vouchers          Vouchers[]
+  points            User_Points?
+  referral_made     Referral[]         @relation("referrer")
+  referral_used     Referral[]         @relation("referee")
+  transactions      Transactions[]
+  Event             Event[]
+}
+
+model Organizer_Profile {
+  id                 Int              @id @default(autoincrement())
+  user               User             @relation(fields: [user_id], references: [id])
+  user_id            Int              @unique
+  organization_name  String
+  organization_email String
+  phone_number       String
+  address            String
+  website_url        String?
+  status_approval    Organizer_Status @default(PENDING)
+  submitted_at       DateTime         @default(now()) @db.Timestamptz(6)
+  reviewed_at        DateTime?        @db.Timestamptz(6)
+  rejection_reason   String?
+}
+
+model Referral {
+  id          Int       @id @default(autoincrement())
+  referrer    User      @relation("referrer", fields: [referrer_id], references: [id])
+  referrer_id Int
+  referee     User      @relation("referee", fields: [referree_id], references: [id])
+  referree_id Int
+  created_at  DateTime? @default(now()) @db.Timestamptz(6)
+}
+
+model User_Points {
+  id         Int          @id @default(autoincrement())
+  user       User         @relation(fields: [user_id], references: [id])
+  user_id    Int          @unique
+  amount     Int          @default(0)
+  source     point_source
+  expired_at DateTime     @db.Timestamptz(6)
+  created_at DateTime?    @default(now()) @db.Timestamptz(6)
+}
+
+model Coupons {
+  id             Int            @id @default(autoincrement())
+  user           User           @relation(fields: [user_id], references: [id])
+  user_id        Int
+  code           String         @unique
+  discount_value Int
+  expired_at     DateTime       @db.Timestamptz(6)
+  is_used        Boolean        @default(false)
+  created_at     DateTime?      @default(now()) @db.Timestamptz(6)
+  Transactions   Transactions[]
+}
+
+model Vouchers {
+  id             Int            @id @default(autoincrement())
+  event          Event          @relation(fields: [event_id], references: [id])
+  event_id       Int
+  user           User           @relation(fields: [user_id], references: [id])
+  user_id        Int
+  code           String         @unique
+  discount_value Int
+  start_date     DateTime       @db.Timestamptz(6)
+  end_date       DateTime       @db.Timestamptz(6)
+  status         Voucher_Status @default(ACTIVE)
+  Transactions   Transactions[]
+}
+
+model Event {
+  id              Int            @id @default(autoincrement())
+  organizer       User           @relation(fields: [organizer_id], references: [id])
+  organizer_id    Int
+  name            String
+  description     String
+  category        String
+  location        String
+  paid            Boolean
+  price           Int
+  start_date      DateTime       @db.Timestamptz(6)
+  end_date        DateTime       @db.Timestamptz(6)
+  total_seats     Int
+  remaining_seats Int
+  created_at      DateTime?      @default(now()) @db.Timestamptz(6)
+  ticket_types    Ticket_Type[]
+  reviews         Reviews[]
+  transactions    Transactions[]
+  vouchers        Vouchers[]
+}
+
+model Ticket_Type {
+  id                  Int                   @id @default(autoincrement())
+  event               Event                 @relation(fields: [event_id], references: [id])
+  event_id            Int
+  name                String
+  price               Int
+  quantity            Int
+  Transactions_Detail Transactions_Detail[]
+}
+
+model Transactions {
+  id              Int                   @id @default(autoincrement())
+  user            User                  @relation(fields: [user_id], references: [id])
+  user_id         Int
+  event           Event                 @relation(fields: [event_id], references: [id])
+  event_id        Int
+  status          transaction_status    @default(WAITING)
+  total_amount    Int
+  payment_proof   String?
+  used_point      Int                   @default(0)
+  user_coupon     Coupons?              @relation(fields: [used_coupon_id], references: [id])
+  used_coupon_id  Int?
+  used_voucher    Vouchers?             @relation(fields: [used_voucher_id], references: [id])
+  used_voucher_id Int?
+  created_at      DateTime?             @default(now()) @db.Timestamptz(6)
+  details         Transactions_Detail[]
+  reviews         Reviews?
+}
+
+model Transactions_Detail {
+  id             Int          @id @default(autoincrement())
+  transaction    Transactions @relation(fields: [transaction_id], references: [id])
+  transaction_id Int
+  ticket_type    Ticket_Type  @relation(fields: [ticket_type_id], references: [id])
+  ticket_type_id Int
+  quantity       Int
+}
+
+model Reviews {
+  id             Int          @id @default(autoincrement())
+  transaction    Transactions @relation(fields: [transaction_id], references: [id])
+  transaction_id Int          @unique
+  event          Event        @relation(fields: [event_id], references: [id])
+  event_id       Int
+  rating         Int
+  comment        String
+  created_at     DateTime?    @default(now()) @db.Timestamptz(6)
 }
