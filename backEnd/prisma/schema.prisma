@@ -32,6 +32,8 @@ enum point_source {
 }
 
 enum transaction_status {
+  WAITING_PAYMENT
+  WAITING_CONFIRMATION
   WAITING
   CONFIRMED
   REJECTED
@@ -157,7 +159,7 @@ model Transactions {
   user_id         Int
   event           Event                 @relation(fields: [event_id], references: [id])
   event_id        Int
-  status          transaction_status    @default(WAITING)
+  status          transaction_status    @default(WAITING_PAYMENT)
   total_amount    Int
   payment_proof   String?
   used_point      Int                   @default(0)
