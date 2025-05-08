@@ -3,6 +3,7 @@ export interface IRegister {
     email: string;
     password: string;
     referralCode?: string;
+    is_verified: boolean;
 }
 
 export interface ILogin {
@@ -23,4 +24,10 @@ export interface AuthResponse {
         email: string;
         role: "CUSTOMER" | "ORGANIZER";
     }
+}
+
+export interface IEmail_Verification_Response {
+    success: boolean;
+    message: string;
+    rewarded_points?: number;
 }
