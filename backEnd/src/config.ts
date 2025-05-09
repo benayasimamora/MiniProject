@@ -1,3 +1,14 @@
 import "dotenv/config";
 
-export const { PORT, SECRET_KEY } = process.env;
+export const {
+  PORT,
+  SECRET_KEY,
+  EXPIRES_IN,
+  MAILTRAP_HOST,
+  MAILTRAP_PORT,
+  MAILTRAP_USER,
+  MAILTRAP_PASS,
+  CLOUDINARY_NAME,
+  CLOUDINARY_KEY,
+  CLOUDINARY_SECRET,
+} = process.env;
