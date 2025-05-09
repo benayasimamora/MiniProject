@@ -1,6 +1,6 @@
 export interface IReferral {
   id: number;
-  referred_id: number;
+  referrer_id: number;
   referee_id: number;
   created_at: Date;
 }
