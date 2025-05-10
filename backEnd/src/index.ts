@@ -5,6 +5,7 @@ import helmet from "helmet";
 import authRoutes from "./routers/auth";
 import { errorHandler } from "./middlewares/errorHandler";
 import referralRoutes from "./routers/referral";
+import organizerRoutes from "./routers/organizer";
 
 const app: Application = express();
 
@@ -15,6 +16,7 @@ app.use(express.json());
 
 app.use("/api/auth", authRoutes);
 app.use("/api/referral", referralRoutes);
+app.use("/organizer", organizerRoutes);
 app.use(errorHandler);
 
 app.get("/", (req: Request, res: Response) => {
