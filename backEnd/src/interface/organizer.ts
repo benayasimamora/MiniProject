@@ -21,3 +21,11 @@ export interface OrganizerProfile {
   reviewed_at?: Date;
   rejection_reason?: string;
 }
+
+export interface OrganizerApplyDTO {
+  organization_name: string;
+  organization_email: string;
+  phone_number: string;
+  website_url?: string;
+  address: string;
+}

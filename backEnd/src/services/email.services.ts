@@ -6,7 +6,7 @@ import {
   MAILTRAP_USER,
 } from "../config";
 
-const transporter = nodemailer.createTransport({
+export const transporter = nodemailer.createTransport({
   host: MAILTRAP_HOST,
   port: +MAILTRAP_PORT!,
   auth: { user: MAILTRAP_USER, pass: MAILTRAP_PASS },

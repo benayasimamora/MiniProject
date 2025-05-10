@@ -1,18 +1,20 @@
-import { NextFunction, Request, Response } from 'express';
-import { AnyZodObject } from 'zod';
+import { NextFunction, Request, Response, RequestHandler } from "express";
+import { ZodSchema } from "zod";
 
-export const validate = (schema: AnyZodObject) => {
-    return (req: Request, res: Response, next: NextFunction): void => {
-        try {
-        schema.parse(req.body);
-        next();
-        } catch (error: any) {
-        res.status(400).json({
-            success: false,
-            message: 'Validasi gagal',
-            errors: error.errors || error.message,
-        });
-        return;
-        }
-    };
+export const validate = (schema: ZodSchema): RequestHandler => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const result = schema.safeParse(req.body);
+    if (!result.success) {
+      res.status(400).json({
+        status: "error",
+        errors: result.error.errors.map((e) => ({
+          field: e.path.join("."),
+          message: e.message,
+        })),
+      });
+      return;
+    }
+    req.body = result.data;
+    next();
+  };
 };
