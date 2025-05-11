@@ -9,6 +9,9 @@ import organizerRoutes from "./routers/organizer";
 import { startExpirationJobs } from "./utils/scheduler";
 import profileRoutes from "./routers/profile";
 import organizerProfileRoutes from "./routers/organizer.profile";
+import dashboardRoutes from "./routers/dashboard";
+import { authGuard } from "./middlewares/authGuard";
+import { roleGuard } from "./middlewares/roleGuard";
 
 const app: Application = express();
 
@@ -23,6 +26,7 @@ app.use("/organizer", organizerRoutes);
 startExpirationJobs();
 app.use("/api/profile", profileRoutes);
 app.use("/api/organizer", organizerProfileRoutes);
+app.use("/api/dashboard", authGuard, roleGuard(["ORGANIZER"]), dashboardRoutes);
 app.use(errorHandler);
 
 app.get("/", (req: Request, res: Response) => {
