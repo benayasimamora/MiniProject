@@ -8,10 +8,10 @@ CREATE TYPE "Organizer_Status" AS ENUM ('PENDING', 'APPROVED', 'REJECTED');
 CREATE TYPE "Voucher_Status" AS ENUM ('ACTIVE', 'USED', 'EXPIRED');
 
 -- CreateEnum
-CREATE TYPE "point_source" AS ENUM ('REFERRAL', 'REFUND', 'REDEEM');
+CREATE TYPE "point_source" AS ENUM ('REFERRAL', 'REFUND', 'REDEEM', 'VERIFICATION', 'TRANSACTION_CANCEL_REFUND');
 
 -- CreateEnum
-CREATE TYPE "transaction_status" AS ENUM ('WAITING_PAYMENT', 'WAITING_CONFIRMATION', 'CONFIRMED', 'REJECTED', 'EXPIRED', 'CANCELED');
+CREATE TYPE "transaction_status" AS ENUM ('WAITING_PAYMENT', 'PENDING', 'WAITING_CONFIRMATION', 'CONFIRMED', 'REJECTED', 'EXPIRED', 'CANCELED');
 
 -- CreateTable
 CREATE TABLE "User" (
@@ -50,7 +50,7 @@ CREATE TABLE "Organizer_Profile" (
 CREATE TABLE "Referral" (
     "id" SERIAL NOT NULL,
     "referrer_id" INTEGER NOT NULL,
-    "referree_id" INTEGER NOT NULL,
+    "referee_id" INTEGER NOT NULL,
     "created_at" TIMESTAMPTZ(6) DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "Referral_pkey" PRIMARY KEY ("id")
@@ -109,6 +109,7 @@ CREATE TABLE "Event" (
     "end_date" TIMESTAMPTZ(6) NOT NULL,
     "total_seats" INTEGER NOT NULL,
     "remaining_seats" INTEGER NOT NULL,
+    "requires_organizer_confirmation" BOOLEAN NOT NULL DEFAULT false,
     "created_at" TIMESTAMPTZ(6) DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "Event_pkey" PRIMARY KEY ("id")
@@ -120,7 +121,7 @@ CREATE TABLE "Ticket_Type" (
     "event_id" INTEGER NOT NULL,
     "name" TEXT NOT NULL,
     "price" INTEGER NOT NULL,
-    "quantity" INTEGER NOT NULL,
+    "quantity_available" INTEGER NOT NULL,
 
     CONSTRAINT "Ticket_Type_pkey" PRIMARY KEY ("id")
 );
@@ -131,12 +132,23 @@ CREATE TABLE "Transactions" (
     "user_id" INTEGER NOT NULL,
     "event_id" INTEGER NOT NULL,
     "status" "transaction_status" NOT NULL DEFAULT 'WAITING_PAYMENT',
-    "total_amount" INTEGER NOT NULL,
+    "gross_amount" INTEGER NOT NULL,
+    "net_amount" INTEGER NOT NULL,
     "payment_proof" TEXT,
-    "used_point" INTEGER NOT NULL DEFAULT 0,
+    "used_point_amount" INTEGER NOT NULL DEFAULT 0,
     "used_coupon_id" INTEGER,
     "used_voucher_id" INTEGER,
+    "midtrans_order_id" TEXT,
+    "midtrans_snap_token" TEXT,
+    "midtrans_payment_type" TEXT,
+    "midtrans_transaction_time" TIMESTAMP(3),
+    "midtrans_settlement_time" TIMESTAMP(3),
     "created_at" TIMESTAMPTZ(6) DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMPTZ(6),
+    "payment_due_date" TIMESTAMP(3),
+    "organizer_confirmation_due_date" TIMESTAMP(3),
+    "organizer_confirmed_at" TIMESTAMP(3),
+    "cancellation_reason" TEXT,
 
     CONSTRAINT "Transactions_pkey" PRIMARY KEY ("id")
 );
@@ -147,6 +159,8 @@ CREATE TABLE "Transactions_Detail" (
     "transaction_id" INTEGER NOT NULL,
     "ticket_type_id" INTEGER NOT NULL,
     "quantity" INTEGER NOT NULL,
+    "price_per_ticket" INTEGER NOT NULL,
+    "subtotal" INTEGER NOT NULL,
 
     CONSTRAINT "Transactions_Detail_pkey" PRIMARY KEY ("id")
 );
@@ -154,6 +168,7 @@ CREATE TABLE "Transactions_Detail" (
 -- CreateTable
 CREATE TABLE "Reviews" (
     "id" SERIAL NOT NULL,
+    "user_id" INTEGER NOT NULL,
     "transaction_id" INTEGER NOT NULL,
     "event_id" INTEGER NOT NULL,
     "rating" INTEGER NOT NULL,
@@ -182,7 +197,31 @@ CREATE UNIQUE INDEX "Coupons_code_key" ON "Coupons"("code");
 CREATE UNIQUE INDEX "Vouchers_code_key" ON "Vouchers"("code");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "Transactions_midtrans_order_id_key" ON "Transactions"("midtrans_order_id");
+
+-- CreateIndex
+CREATE INDEX "Transactions_user_id_idx" ON "Transactions"("user_id");
+
+-- CreateIndex
+CREATE INDEX "Transactions_event_id_idx" ON "Transactions"("event_id");
+
+-- CreateIndex
+CREATE INDEX "Transactions_status_idx" ON "Transactions"("status");
+
+-- CreateIndex
+CREATE INDEX "Transactions_payment_due_date_idx" ON "Transactions"("payment_due_date");
+
+-- CreateIndex
+CREATE INDEX "Transactions_organizer_confirmation_due_date_idx" ON "Transactions"("organizer_confirmation_due_date");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "Reviews_transaction_id_key" ON "Reviews"("transaction_id");
+
+-- CreateIndex
+CREATE INDEX "Reviews_user_id_idx" ON "Reviews"("user_id");
+
+-- CreateIndex
+CREATE INDEX "Reviews_event_id_idx" ON "Reviews"("event_id");
 
 -- AddForeignKey
 ALTER TABLE "Organizer_Profile" ADD CONSTRAINT "Organizer_Profile_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -191,7 +230,7 @@ ALTER TABLE "Organizer_Profile" ADD CONSTRAINT "Organizer_Profile_user_id_fkey" 
 ALTER TABLE "Referral" ADD CONSTRAINT "Referral_referrer_id_fkey" FOREIGN KEY ("referrer_id") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Referral" ADD CONSTRAINT "Referral_referree_id_fkey" FOREIGN KEY ("referree_id") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "Referral" ADD CONSTRAINT "Referral_referee_id_fkey" FOREIGN KEY ("referee_id") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "User_Points" ADD CONSTRAINT "User_Points_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -228,6 +267,9 @@ ALTER TABLE "Transactions_Detail" ADD CONSTRAINT "Transactions_Detail_transactio
 
 -- AddForeignKey
 ALTER TABLE "Transactions_Detail" ADD CONSTRAINT "Transactions_Detail_ticket_type_id_fkey" FOREIGN KEY ("ticket_type_id") REFERENCES "Ticket_Type"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Reviews" ADD CONSTRAINT "Reviews_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Reviews" ADD CONSTRAINT "Reviews_transaction_id_fkey" FOREIGN KEY ("transaction_id") REFERENCES "Transactions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

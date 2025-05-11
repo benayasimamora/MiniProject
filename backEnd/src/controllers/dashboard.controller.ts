@@ -1,10 +1,21 @@
 import { Response } from 'express';
-import { AuthRequest } from '../middlewares/auth';
+import { AuthRequest } from '../middlewares/auth'; 
 
-export const getDashboard = (req: AuthRequest, res: Response) => {
-    return res.status(200).json({
+export const getDashboard = (req: AuthRequest, res: Response): void => { 
+    if (!req.user) {
+        res.status(401).json({
+            success: false,
+            message: 'Akses ditolak. Pengguna tidak terautentikasi.',
+        });
+        return; // Return setelah mengirim respons
+    }
+
+    res.status(200).json({
         success: true,
-        message: 'Welcome to Organizer Dashboard',
-        user: req.user,
+        message: 'Selamat datang di Dashboard Organizer',
+        user: {
+            user_id: req.user.user_id,
+            role: req.user.role,
+        },
     });
 };

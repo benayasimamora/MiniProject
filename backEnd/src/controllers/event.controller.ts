@@ -1,91 +1,111 @@
 import { Request, Response, NextFunction } from "express";
-import { getAllEvents, getEventbyID, deleteEvent, createEvent as createEventServiceFunction, searchEvents as searchEventsService } from "../services/event.services";
+import { 
+    getAllEvents, 
+    getEventbyID, // getEventById lebih konsisten
+    deleteEvent as deleteEventService, // Alias agar tidak konflik dengan nama fungsi
+    createEvent as createEventService, 
+    searchEvents as searchEventsService 
+} from "../services/event.services"; // Nama file: event.services.ts
 import { successResponse, errorResponse } from "../utils/response";
 import { ICreateEvent } from "../interface/event.interface";
-import { error } from "console";
+// import { error } from "console"; // 'error' dari console tidak digunakan
+import { AuthRequestWithUser } from "../middlewares/authGuard"; // Menggunakan interface dari authGuard
 
-// tampilkan event
-export const getAllEventsController = async (req : Request, res : Response): Promise<void> => {
+// tampilkan semua event
+export const getAllEventsController = async (req : Request, res : Response, next: NextFunction): Promise<void> => {
     try {
         const events = await getAllEvents();
-        successResponse(res, events, 'Daftar Event Berhasil Diambil');
+        successResponse(res, events, 'Daftar semua event berhasil diambil');
     } catch(error:any) {
-        errorResponse(res, error.message || 'Gagal Mengambil Daftar Event', 500);
+        // errorResponse(res, error.message || 'Gagal mengambil daftar event', error.status || 500);
+        next(error); // Biarkan errorHandler menangani
     }
 };
 
 //  menampilkan event dengan keyword
-export const searchEvents = async (req:Request, res:Response, next:NextFunction)=>{
+export const searchEventsController = async (req:Request, res:Response, next:NextFunction)=>{ // nama diubah agar lebih deskriptif
     try {
         const { keyword } = req.query;
 
         if (!keyword || typeof keyword !== 'string'){
-            errorResponse(res, 'Keyword Harus Tersedia', 400);
+            // errorResponse(res, 'Keyword pencarian harus berupa string dan tidak boleh kosong', 400);
+            // return;
+            // Jika keyword kosong, mungkin lebih baik kembalikan semua event atau array kosong
+            const allEvents = await getAllEvents();
+            successResponse(res, allEvents, 'Menampilkan semua event karena keyword tidak ada.');
             return;
         }
 
         const events = await searchEventsService(keyword);
-
-        successResponse(res, events, 'Pencarian event berhasil');
+        if (events.length === 0) {
+            successResponse(res, [], `Tidak ada event yang cocok dengan keyword "${keyword}"`);
+        } else {
+            successResponse(res, events, `Hasil pencarian event untuk keyword "${keyword}"`);
+        }
 
     } catch(error) {
-        console.error(error);
-        errorResponse(res, (error as Error).message || 'Gagal mencari event', 500);
+        // console.error("Error in searchEventsController:", error); // Log error server-side
+        // errorResponse(res, (error as Error).message || 'Gagal mencari event', 500);
+        next(error);
     }
 }
 
 // membuat event baru
-export const createEvent = async (req: Request, res: Response): Promise<void> => {
+export const createEventController = async (req: AuthRequestWithUser, res: Response, next: NextFunction): Promise<void> => { // Menggunakan AuthRequestWithUser
     try {
-        if(req.user ?.role != 'ORGANIZER'){
-            res.status(403).json({
-                success: false,
-                message: 'Hanya organizer yang dapat membuat event ya',
-            });
-            return;
-        }
+        // Role check sudah dilakukan oleh roleGuard middleware jika rute diproteksi
+        // if(req.user?.role !== 'ORGANIZER'){
+        //     errorResponse(res, 'Hanya organizer yang dapat membuat event', 403);
+        //     return;
+        // }
 
         const input : ICreateEvent = req.body;
-        const newEvent = await createEventServiceFunction(input, req.user.id);
+        const organizerId = req.user!.user_id; // Ambil user_id dari token
+        const newEvent = await createEventService(input, organizerId);
 
         successResponse(res, newEvent, 'Event berhasil dibuat', 201);
 
-
     } catch (error : any){
-        errorResponse(res, error.message || 'Gagal membuat event', 500);
+        // errorResponse(res, error.message || 'Gagal membuat event', error.status || 500);
+        next(error);
     }
 };
 
-
 // delete event
-export const deleteEventController = async (req: Request, res: Response) => {
+export const deleteEventController = async (req: AuthRequestWithUser, res: Response, next: NextFunction) => { // Menggunakan AuthRequestWithUser
     try {
         const eventId = Number(req.params.id);
-        const result = await deleteEvent(eventId, req.user!.id);
+        if (isNaN(eventId)) {
+            // errorResponse(res, 'ID event tidak valid', 400);
+            // return;
+            throw { status: 400, message: 'ID event tidak valid' };
+        }
+        const organizerId = req.user!.id; // Ambil user_id dari token (pastikan req.user.id ada, atau user_id)
+                                        // Dari authGuard.ts, req.user adalah IJwt { user_id, role }
+                                        // Jadi, seharusnya req.user!.user_id
+
+        const result = await deleteEventService(eventId, req.user!.user_id);
     
-        res.status(200).json({
-            success: true,
-            message: result.message,
-        });
+        successResponse(res, null, result.message, 200); // Tidak ada data yang dikembalikan, cukup pesan
     } catch (err: any) {
-        res.status(400).json({
-            success: false,
-            message: err.message || 'Gagal menghapus event',
-        });
+        // errorResponse(res, err.message || 'Gagal menghapus event', err.status || 400);
+        next(err);
     }
 };
 
 // tampilkan event berdasarkan ID
-export const getEventByIdController = async (req: Request, res: Response): Promise<void> => {
+export const getEventByIdController = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
         const id = parseInt(req.params.id);
         if (isNaN(id)) {
-            res.status(400).json({ success: false, message: 'ID tidak valid' });
-            return;
+            // errorResponse(res, 'ID event tidak valid', 400);
+            // return;
+            throw { status: 400, message: 'ID event tidak valid' };
         }
-        const event = await getEventbyID(id);
+        const event = await getEventbyID(id); // getEventById
         successResponse(res, event, 'Detail event berhasil diambil');
     } catch (error: any) {
-        errorResponse(res, error.message || 'Gagal mengambil detail event', 404);
+        // errorResponse(res, error.message || 'Gagal mengambil detail event', error.status || 404);
+        next(error);
     }
 };

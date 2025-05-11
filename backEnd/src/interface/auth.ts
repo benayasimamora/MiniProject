@@ -12,6 +12,7 @@ export interface ILogin {
 }
 
 export interface IJwt {
+    id: any;
     user_id: number;
     role: "CUSTOMER" | "ORGANIZER";
 }

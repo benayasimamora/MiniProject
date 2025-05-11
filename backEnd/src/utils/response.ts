@@ -1,5 +1,5 @@
 import { Response } from "express";
-import { stat } from "fs";
+// import { stat } from "fs"; // 'stat' tidak digunakan
 
 export const successResponse = (
     res: Response,
@@ -13,7 +13,6 @@ export const successResponse = (
         data,
     });
 };
-
 
 export const errorResponse = (
     res : Response,
