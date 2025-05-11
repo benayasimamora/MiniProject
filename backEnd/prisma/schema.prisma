@@ -27,18 +27,21 @@ enum Voucher_Status {
 
 enum point_source {
   REFERRAL
-  REFUND
+  REFUND // Tambahkan jika ada proses refund poin
   REDEEM
+  VERIFICATION // Untuk poin verifikasi
+  TRANSACTION_CANCEL_REFUND // Poin dikembalikan karena transaksi batal
 }
 
+// Disesuaikan dengan kebutuhan fitur transaksi
 enum transaction_status {
-  WAITING_PAYMENT
-  WAITING_CONFIRMATION
-  WAITING
-  CONFIRMED
-  REJECTED
-  EXPIRED
-  CANCELED
+  WAITING_PAYMENT      // Menunggu pembayaran (setelah checkout, sebelum bayar di Midtrans)
+  PENDING              // Pembayaran sedang diproses oleh Midtrans (misal menunggu VA dibayar)
+  WAITING_CONFIRMATION // Pembayaran berhasil (settlement dari Midtrans), menunggu konfirmasi organizer
+  CONFIRMED            // Pembayaran berhasil DAN dikonfirmasi organizer (atau tidak butuh konfirmasi organizer)
+  REJECTED             // Ditolak oleh organizer atau pembayaran gagal/ditolak Midtrans
+  EXPIRED              // Tidak dibayar dalam batas waktu (baik oleh Midtrans atau batas 2 jam internal jika payment_proof)
+  CANCELED             // Dibatalkan (misal oleh sistem karena organizer tidak konfirm dalam 3 hari, atau oleh user)
 }
 
 model User {
@@ -60,6 +63,7 @@ model User {
   referral_used     Referral[]         @relation("referee")
   transactions      Transactions[]
   Event             Event[]
+  reviews_written   Reviews[]          @relation("UserReviews")
 }
 
 model Organizer_Profile {
@@ -81,8 +85,8 @@ model Referral {
   id          Int       @id @default(autoincrement())
   referrer    User      @relation("referrer", fields: [referrer_id], references: [id])
   referrer_id Int
-  referee     User      @relation("referee", fields: [referree_id], references: [id])
-  referree_id Int
+  referee     User      @relation("referee", fields: [referee_id], references: [id])
+  referee_id  Int // Sebelumnya 'referree_id', saya perbaiki
   created_at  DateTime? @default(now()) @db.Timestamptz(6)
 }
 
@@ -123,53 +127,82 @@ model Vouchers {
 }
 
 model Event {
-  id              Int            @id @default(autoincrement())
-  organizer       User           @relation(fields: [organizer_id], references: [id])
-  organizer_id    Int
-  name            String
-  description     String
-  category        String
-  location        String
-  paid            Boolean
-  price           Int
-  start_date      DateTime       @db.Timestamptz(6)
-  end_date        DateTime       @db.Timestamptz(6)
-  total_seats     Int
-  remaining_seats Int
-  created_at      DateTime?      @default(now()) @db.Timestamptz(6)
-  ticket_types    Ticket_Type[]
-  reviews         Reviews[]
-  transactions    Transactions[]
-  vouchers        Vouchers[]
+  id                 Int            @id @default(autoincrement())
+  organizer          User           @relation(fields: [organizer_id], references: [id])
+  organizer_id       Int
+  name               String
+  description        String
+  category           String
+  location           String
+  paid               Boolean
+  price              Int            // Harga default tiket jika tidak ada Ticket_Type
+  start_date         DateTime       @db.Timestamptz(6)
+  end_date           DateTime       @db.Timestamptz(6)
+  total_seats        Int
+  remaining_seats    Int
+  // BARU: Apakah event ini memerlukan konfirmasi manual dari organizer setelah pembayaran?
+  requires_organizer_confirmation Boolean @default(false) 
+  created_at         DateTime?      @default(now()) @db.Timestamptz(6)
+  ticket_types       Ticket_Type[]
+  reviews            Reviews[]      @relation("EventReviews")
+  transactions       Transactions[]
+  vouchers           Vouchers[]
 }
 
 model Ticket_Type {
   id                  Int                   @id @default(autoincrement())
   event               Event                 @relation(fields: [event_id], references: [id])
   event_id            Int
-  name                String
-  price               Int
-  quantity            Int
+  name                String                // e.g., "Regular", "VIP"
+  price               Int                   // Harga per tiket untuk tipe ini
+  quantity_available  Int                   // Jumlah tiket yang tersedia untuk tipe ini
+  // remaining_quantity Int                // Sisa tiket untuk tipe ini, bisa di-handle di logic
   Transactions_Detail Transactions_Detail[]
 }
 
 model Transactions {
-  id              Int                   @id @default(autoincrement())
-  user            User                  @relation(fields: [user_id], references: [id])
-  user_id         Int
-  event           Event                 @relation(fields: [event_id], references: [id])
-  event_id        Int
-  status          transaction_status    @default(WAITING_PAYMENT)
-  total_amount    Int
-  payment_proof   String?
-  used_point      Int                   @default(0)
-  user_coupon     Coupons?              @relation(fields: [used_coupon_id], references: [id])
-  used_coupon_id  Int?
-  used_voucher    Vouchers?             @relation(fields: [used_voucher_id], references: [id])
-  used_voucher_id Int?
-  created_at      DateTime?             @default(now()) @db.Timestamptz(6)
-  details         Transactions_Detail[]
-  reviews         Reviews?
+  id                      Int                   @id @default(autoincrement())
+  user                    User                  @relation(fields: [user_id], references: [id])
+  user_id                 Int
+  event                   Event                 @relation(fields: [event_id], references: [id])
+  event_id                Int
+  status                  transaction_status    @default(WAITING_PAYMENT)
+  // Harga sebelum diskon, poin, dll.
+  gross_amount            Int
+  // Total yang harus dibayar setelah diskon, poin
+  net_amount              Int                   
+  payment_proof           String?               // Masih ada jika diperlukan untuk metode manual, tapi Midtrans utama
+  used_point_amount       Int                   @default(0)
+  user_coupon             Coupons?              @relation(fields: [used_coupon_id], references: [id])
+  used_coupon_id          Int?
+  used_voucher            Vouchers?             @relation(fields: [used_voucher_id], references: [id])
+  used_voucher_id         Int?
+  
+  // Midtrans related fields
+  midtrans_order_id       String?               @unique // ID transaksi dari Midtrans
+  midtrans_snap_token     String?               // Token untuk Midtrans Snap UI
+  midtrans_payment_type   String?               // e.g., "credit_card", "gopay", "bank_transfer"
+  midtrans_transaction_time DateTime?           // Waktu transaksi dibuat di Midtrans
+  midtrans_settlement_time DateTime?            // Waktu pembayaran berhasil di Midtrans
+  
+  // Timestamps & Status Control
+  created_at              DateTime?             @default(now()) @db.Timestamptz(6)
+  updated_at              DateTime?             @updatedAt @db.Timestamptz(6)
+  // Kapan transaksi ini akan dianggap expired jika tidak ada pembayaran (untuk payment_proof atau Midtrans)
+  payment_due_date        DateTime?             
+  // Kapan konfirmasi organizer akan dianggap expired jika statusnya WAITING_CONFIRMATION
+  organizer_confirmation_due_date DateTime?     
+  organizer_confirmed_at  DateTime?             // Waktu konfirmasi oleh organizer
+  cancellation_reason     String?               // Alasan pembatalan
+
+  details                 Transactions_Detail[]
+  reviews                 Reviews?
+
+  @@index([user_id])
+  @@index([event_id])
+  @@index([status])
+  @@index([payment_due_date])
+  @@index([organizer_confirmation_due_date])
 }
 
 model Transactions_Detail {
@@ -179,15 +212,22 @@ model Transactions_Detail {
   ticket_type    Ticket_Type  @relation(fields: [ticket_type_id], references: [id])
   ticket_type_id Int
   quantity       Int
+  price_per_ticket Int        // Harga tiket pada saat transaksi (untuk histori)
+  subtotal       Int          // quantity * price_per_ticket
 }
 
 model Reviews {
   id             Int          @id @default(autoincrement())
+  user           User         @relation("UserReviews", fields: [user_id], references: [id])
+  user_id        Int
   transaction    Transactions @relation(fields: [transaction_id], references: [id])
   transaction_id Int          @unique
-  event          Event        @relation(fields: [event_id], references: [id])
+  event          Event        @relation("EventReviews", fields: [event_id], references: [id])
   event_id       Int
   rating         Int
   comment        String
   created_at     DateTime?    @default(now()) @db.Timestamptz(6)
+
+  @@index([user_id])
+  @@index([event_id])
 }

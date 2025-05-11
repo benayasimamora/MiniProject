@@ -14,7 +14,7 @@ export interface OrganizerProfile {
   organization_name: string;
   organization_email: string;
   phone_number: string;
-  website_url: string;
+  website_url: string; // Seharusnya opsional jika di IOrganizer opsional
   address: string;
   status: organizer_status;
   submitted_at: Date;
