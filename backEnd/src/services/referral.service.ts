@@ -7,17 +7,21 @@ export class ReferralService {
       where: { referral_code: code },
     });
     if (!referrer) throw { status: 400, message: "Referral code invalid" };
-    // create log
+    // rekam referral
     await prisma.referral.create({
       data: { referrer_id: referrer.id, referree_id: newUserId },
     });
-    // credit 10 point
+
+    const expireDate = new Date();
+    expireDate.setMonth(expireDate.getMonth() + 3);
+
+    // credit 10000 point
     await prisma.user_Points.create({
       data: {
         user_id: referrer.id,
-        amount: 10,
+        amount: 10000,
         source: "REFERRAL",
-        expired_at: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000), // 3 bulan
+        expired_at: expireDate,
       },
     });
     // generate coupon untuk referee
@@ -26,19 +30,22 @@ export class ReferralService {
         user_id: newUserId,
         code: `CPN-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
         discount_value: 5000,
-        expired_at: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000),
+        expired_at: expireDate,
       },
     });
   }
 
   // saat verifikasi email, credit point 10 ke user
   static async creditVerificationPoints(userId: number) {
+    const expireDate = new Date();
+    expireDate.setMonth(expireDate.getMonth() + 3);
+
     await prisma.user_Points.create({
       data: {
         user_id: userId,
         amount: 10,
         source: "REFERRAL",
-        expired_at: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000),
+        expired_at: expireDate,
       },
     });
   }
