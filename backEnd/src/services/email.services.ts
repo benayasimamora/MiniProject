@@ -22,4 +22,17 @@ export class EmailService {
       html: `<p>Click <a href="${verificationLink}">di sini</a> untuk verifikasi email anda.</p>`,
     });
   }
+
+  static async sendResetPasswordEmail(to: string, token: string) {
+    const url = `${process.env.APP_URL}/reset-password?token=${token}`;
+    await transporter.sendMail({
+      from: "'EventApp' <no-reply@eventapp.com>",
+      to,
+      subject: "Reset Password",
+      html: `
+      <p>Anda meminta reset password. Klik link berikut untuk mengatur ulang:</p>
+      <a href="${url}">${url}</a>
+      <p>Link ini berlaku 1 jam.</p>`,
+    });
+  }
 }
