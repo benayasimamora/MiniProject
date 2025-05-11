@@ -1,11 +1,11 @@
-<<<<<<< HEAD
+
 // ... impor lainnya ...
 import express, { Express, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import { PORT } from './config';
 import { errorHandler } from './middlewares/errorHandler'; // Pastikan path benar
 import { startExpireCronJob } from './utils/cron/expiretask'; // Path ke cron
-=======
+
 import express, { Application, Request, Response, NextFunction } from "express";
 import { PORT } from "./config";
 import cors from "cors";
@@ -17,7 +17,10 @@ import organizerRoutes from "./routers/organizer";
 import { startExpirationJobs } from "./utils/scheduler";
 import profileRoutes from "./routers/profile";
 import organizerProfileRoutes from "./routers/organizer.profile";
->>>>>>> 827f6d5d8f0bfb7c4ff81713c36e16f8eb8282a5
+
+import dashboardRoutes from "./routers/dashboard";
+import { authGuard } from "./middlewares/authGuard";
+import { roleGuard } from "./middlewares/roleGuard";
 
 // Impor Routers
 import authRouter from './routers/auth';
@@ -36,7 +39,7 @@ app.use(cors()); // Atur CORS sesuai kebutuhan
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-<<<<<<< HEAD
+
 // Static files (jika ada)
 // app.use(express.static("public"));
 
@@ -57,14 +60,17 @@ app.get('/', (req: Request, res: Response) => {
 });
 
 // Error Handler Middleware (harus paling bawah setelah semua rute)
-=======
+
 app.use("/api/auth", authRoutes);
 app.use("/api/referral", referralRoutes);
 app.use("/organizer", organizerRoutes);
 startExpirationJobs();
 app.use("/api/profile", profileRoutes);
 app.use("/api/organizer", organizerProfileRoutes);
->>>>>>> 827f6d5d8f0bfb7c4ff81713c36e16f8eb8282a5
+
+app.use("/api/dashboard", authGuard, roleGuard(["ORGANIZER"]), dashboardRoutes);
+
+
 app.use(errorHandler);
 
 // Jalankan Cron Jobs
